@@ -6,4 +6,11 @@ readme = "README.md"
 requires-python = ">=3.13,<3.14"
 dependencies = [
     "lean-dojo-v2>=1.0.7",
+    "pantograph",
+    "torch>=2.10.0",
+    "torchaudio>=2.10.0",
+    "torchvision>=0.25.0",
 ]
+
+[tool.uv.sources]
+pantograph = { git = "https://github.com/stanford-centaur/PyPantograph" }
