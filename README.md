@@ -1,18 +1,44 @@
 # RL-Lean
 
-Reinforcement learning for automated Lean 4 theorem proving. A policy network learns to select proof tactics by interacting with the Lean prover through [PyPantograph](https://github.com/stanford-centaur/PyPantograph), using the REINFORCE algorithm.
+Reinforcement learning for automated Lean 4 theorem proving with **curriculum learning**. A policy network learns to select proof tactics by interacting with the Lean prover through [PyPantograph](https://github.com/stanford-centaur/PyPantograph), using the REINFORCE algorithm. Theorems the agent proves are fed back as usable lemmas, so it can build up a library of results and reach goals it could not prove from scratch.
 
 ## How it works
 
 An **oracle tactic** (implemented on the Lean side) enumerates candidate proof steps for a given goal state. The RL agent learns to pick the right tactic at each step to close the proof. The training loop:
 
-1. Samples a theorem from a Lean repository
-2. Queries the oracle for available moves at each proof state
+1. Walks the theorems of a Lean file **in source order** (simple → complex), wrapping across epochs
+2. Queries the oracle for available moves at each proof state — including `apply`/`rw` of theorems **already proved earlier in this run**
 3. Uses a policy network to select a move
 4. Receives reward (+1 for closing the proof, -0.1 per step, -1 for dead ends)
 5. Updates the policy with REINFORCE + a running baseline
+6. Records each solved theorem so it becomes an available lemma for later, harder goals
 
 ![Training curves](training_curves.png)
+
+### Curriculum learning
+
+The training script keeps a `proved` set of theorems the agent has closed so far. Before each episode, every proved theorem (except the current goal, to prevent trivially closing it with `exact <itself>`) is offered to the oracle as both an `apply <thm>` and a forward `rw [<thm>]` move. Easy theorems fall first and become lemmas; harder theorems that depend on them then become reachable.
+
+This is exercised by `LeanStuff/Curriculum.lean` in the Lean repo, an ordered Peano-arithmetic curriculum culminating in commutativity of addition:
+
+```
+add_zero : n + 0 = n                  -- definitional (`constructor`)
+add_succ : n + succ m = succ (n + m)  -- definitional (`constructor`)
+zero_add : 0 + n = n                  -- induction
+succ_add : succ m + n = succ (m + n)  -- induction
+add_comm : m + n = n + m              -- CAPSTONE: rewrites all four lemmas + the IH
+```
+
+`add_comm` is *unreachable* with the primitive tactics alone — its inductive step must rewrite subterms — so the agent can only solve it by composing the lemmas it proved earlier. The run logs the climb:
+
+```
++ first proof of Peano.add_zero (proved set now: 1)
++ first proof of Peano.add_succ (proved set now: 2)
++ first proof of Peano.zero_add (proved set now: 3)
++ first proof of Peano.succ_add (proved set now: 4)
++ first proof of Peano.add_comm (proved set now: 5)
+>> SOLVED Peano.add_comm using lemma(s): ['rw [Peano.succ_add]', 'rw [Peano.add_zero]', 'rw [Peano.zero_add]', 'rw [Peano.add_succ]']
+```
 
 ## Project structure
 
@@ -26,11 +52,17 @@ An **oracle tactic** (implemented on the Lean side) enumerates candidate proof s
 
 ### Key definitions
 
-**`OracleTactic`** (`lean_env.py`) — Wraps the Lean-side `so` tactic. Configured with four tactic groups:
+**`OracleTactic`** (`lean_env.py`) — Wraps the Lean-side `so` tactic. Configured with tactic groups:
 - `close`: tactics that close a goal (e.g. `constructor`)
 - `hyp`: tactics that operate on hypotheses (e.g. `induct_rename`, `apply`, `cases`)
 - `var`: tactics that introduce variables (e.g. `intro`)
 - `func`: function/constructor names to try (e.g. `Nat.succ`)
+- `apply`: previously-proved theorems to try as `apply <thm>` / `exact <thm>` (filled in dynamically each episode)
+- `rw`: previously-proved theorems to try as forward `rw [<thm>]`; also offers `rw [<hyp>]` (e.g. the induction hypothesis). Set to `[]` to enable the feature, `None` to disable it
+
+The oracle only returns moves that actually apply to the current goal — it tries each candidate and keeps the ones that succeed.
+
+**`get_theorems`** (`lean_env.py`) — Traces the Lean repository and returns its theorems, optionally filtered to a single `file_path` and sorted by source position (so the curriculum is walked simple → complex).
 
 **`get_moves`** (`lean_env.py`) — Sends the oracle tactic to the Lean server and parses the suggested next moves from the response messages.
 
@@ -61,10 +93,12 @@ uv sync
 
 ### 3. Configure and run
 
-Edit `REPO_URL` in `REINFORCE.py` to point to your local clone of `lean-stuff`:
+In `REINFORCE.py`, point `REPO_URL` at your local clone of `lean-stuff`, and make sure `COMMIT` / `FILE_PATH` select the theorem file you want to train on (defaults to the `Curriculum.lean` curriculum):
 
 ```python
-REPO_URL = "/path/to/your/lean-stuff"
+REPO_URL  = "/path/to/your/lean-stuff"
+COMMIT    = "..."                       # a commit of lean-stuff to trace
+FILE_PATH = "LeanStuff/Curriculum.lean" # which file's theorems to use
 ```
 
 Then run:
@@ -73,12 +107,21 @@ Then run:
 uv run python REINFORCE.py
 ```
 
-Training curves are saved to `training_curves.png` on completion.
+`NUM_EPOCHS` and `BATCH_SIZE` can be overridden via environment variables for quick experiments, e.g.:
+
+```bash
+NUM_EPOCHS=40 uv run python REINFORCE.py
+```
+
+The run prints per-epoch metrics plus a log of first proofs and lemma reuse (see above), and saves training curves to `training_curves.png` on completion.
+
+> **Note:** the first run on a new `COMMIT` traces the repository (via `lean-dojo-v2`), which requires network access and is cached under `raid/data/`. Subsequent runs reuse the cache.
 
 ## Next steps
 
-- **Curriculum learning** — Allow the agent to use previously proved theorems as lemmas when proving new ones, enabling it to build up a library of results and tackle increasingly difficult goals.
 - **Alternative RL algorithms** — Support other policy gradient methods such as PPO or A2C, which may offer more stable training and better sample efficiency compared to vanilla REINFORCE.
+- **Sound "proved" gating** — Currently a theorem counts as proved when the goal closes (reward `+1`); it is not checked to be `sorry`-free. Verify the closed proof's axioms before adding it to the lemma library.
+- **Richer rewrites** — Reverse rewrites (`rw [← thm]`) and deeper curricula (e.g. multiplication: `mul_comm`, distributivity) to push the agent further.
 
 ## References
 
