@@ -125,4 +125,20 @@ The run prints per-epoch metrics plus a log of first proofs and lemma reuse (see
 
 ## References
 
+### Tools
+
+- de Moura, L., & Ullrich, S. (2021). [The Lean 4 Theorem Prover and Programming Language](https://leanprover.github.io/papers/lean4.pdf). *CADE-28*.
+- Yang, K., et al. (2023). [LeanDojo: Theorem Proving with Retrieval-Augmented Language Models](https://arxiv.org/abs/2306.15626). *NeurIPS 2023 (Datasets and Benchmarks)*.
+- Aniva, L., et al. (2025). [Pantograph: A Machine-to-Machine Interaction Interface for Advanced Theorem Proving, High Level Reasoning, and Data Extraction in Lean 4](https://arxiv.org/abs/2410.16429). *TACAS 2025*.
+
+### Theorem proving & curriculum learning
+
+- Polu, S., et al. (2022). [Formal Mathematics Statement Curriculum Learning](https://arxiv.org/abs/2202.01344). *arXiv:2202.01344*.
+- Polu, S., & Sutskever, I. (2020). [Generative Language Modeling for Automated Theorem Proving](https://arxiv.org/abs/2009.03393). *arXiv:2009.03393*.
+- Lample, G., et al. (2022). [HyperTree Proof Search for Neural Theorem Proving](https://arxiv.org/abs/2205.11491). *NeurIPS 2022*.
+
+### Reinforcement learning
+
 - Williams, R.J. (1992). [Simple statistical gradient-following algorithms for connectionist reinforcement learning](https://link.springer.com/article/10.1007/BF00992696). *Machine Learning*, 8(3-4), 229-256.
+- Sutton, R.S., & Barto, A.G. (2018). [Reinforcement Learning: An Introduction](http://incompleteideas.net/book/the-book-2nd.html) (2nd ed.). MIT Press.
+- Bengio, Y., Louradour, J., Collobert, R., & Weston, J. (2009). [Curriculum Learning](https://dl.acm.org/doi/10.1145/1553374.1553380). *ICML 2009*.

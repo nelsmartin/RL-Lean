@@ -13,7 +13,7 @@ from plotting import plot_training_curves
 REPO_URL = "/Users/nelsmartin/Lean/lean-stuff"
 COMMIT = "2e162026d5b4bc822f8d6a961369c56832df252d"
 FILE_PATH = "LeanStuff/Curriculum.lean"
-NUM_EPOCHS = int(os.environ.get("NUM_EPOCHS", 20))
+NUM_EPOCHS = int(os.environ.get("NUM_EPOCHS", 80))
 BATCH_SIZE = int(os.environ.get("BATCH_SIZE", 32))
 GAMMA = 0.9
 LR = 1e-3
